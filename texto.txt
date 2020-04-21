@@ -1,1 +1,26 @@
-Texto de prueba
+--Se agrega validación para permitir precargar los datos (mechavez) 17-04-2020
+				IF EXISTS(SELECT TOP 1 '' FROM dbo.Pacientes WHERE Id = @sIdPaciente and XmlProgramasPMS is NOT NULL)
+				BEGIN
+					UPDATE Pacientes
+					SET XmlProgramasPMS.modify('delete /BloquePrograma/Programa[@Atributos="M"]')
+					WHERE Id = @sIdPaciente
+						DECLARE @xmlPrograma XML;
+						SELECT
+							@xmlPrograma = CAST((SELECT
+									PR.Codigo
+								 ,PR.Descrip AS Nombre
+								 ,PR.Atributos AS Atributos
+								FROM dbo.Programas PR
+								WHERE PR.Sexo IN ('A', PA.Sexo)
+								AND ([dbo].[PacientesEdad](PA.FechaNac, GETDATE(), '|' + PR.RangoEdadInf + '|') >= PR.EdadInf
+								AND [dbo].[PacientesEdad](PA.FechaNac, GETDATE(), '|' + PR.RangoEdadSup + '|') <= PR.EdadSup)
+								AND PR.Atributos = N'M'
+								ORDER BY PR.Descrip
+								FOR XML RAW ('Programa'))
+							AS XML)
+						FROM dbo.Pacientes AS PA
+						WHERE PA.Id = @sIdPaciente
+						UPDATE Pacientes
+						SET XmlProgramasPMS.modify('insert sql:variable("@xmlPrograma")into (/BloquePrograma)[1] ')
+						WHERE Id = @sIdPaciente
+				END
